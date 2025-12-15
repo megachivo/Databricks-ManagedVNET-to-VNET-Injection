@@ -52,13 +52,29 @@ Write-Host "Workspace: $WorkspaceName"
 Write-Host "Setting active subscription..." -ForegroundColor Cyan
 az account set --subscription $SubscriptionId
 
-# Validate VNet existence
-Write-Host "Validating VNet existence..." -ForegroundColor Cyan
-if (-not (az network vnet show --ids $VNetId --query "id" -o tsv 2>$null)) {
-    Write-Warning "VNet with ID '$VNetId' not found."
-    do {
+# Get Workspace Location for validation
+Write-Host "Getting Workspace details..." -ForegroundColor Cyan
+$wsDetails = az resource show --ids $WorkspaceId --output json | ConvertFrom-Json
+$wsLocation = $wsDetails.location
+
+# Validate VNet existence and Region
+Write-Host "Validating VNet existence and configuration..." -ForegroundColor Cyan
+$vnetValid = $false
+while (-not $vnetValid) {
+    $vnetInfo = az network vnet show --ids $VNetId --output json 2>$null | ConvertFrom-Json
+    if (-not $vnetInfo) {
+        Write-Warning "VNet with ID '$VNetId' not found."
         $VNetId = Read-Host "Please re-enter the valid VNet Resource ID"
-    } while (-not (az network vnet show --ids $VNetId --query "id" -o tsv 2>$null))
+        continue
+    }
+    
+    # Check Region
+    if ($vnetInfo.location -ne $wsLocation) {
+        Write-Error "VNet region ($($vnetInfo.location)) does not match Workspace region ($wsLocation). VNet injection requires them to be in the same region."
+        exit 1
+    }
+
+    $vnetValid = $true
 }
 
 # Extract VNet name and Resource Group for subnet validation
@@ -67,22 +83,78 @@ if ($VNetId -match "resourceGroups/(?<rg>[^/]+)/.+/virtualNetworks/(?<name>[^/]+
     $VNetName = $Matches['name']
 }
 
+# Helper function for subnet validation
+function Validate-Subnet {
+    param (
+        [string]$SubnetName,
+        [string]$VNetRG,
+        [string]$VNetName,
+        [string]$Role
+    )
+    
+    $subnetInfo = az network vnet subnet show --resource-group $VNetRG --vnet-name $VNetName --name $SubnetName --output json 2>$null | ConvertFrom-Json
+    
+    if (-not $subnetInfo) {
+        Write-Warning "$Role Subnet '$SubnetName' not found in VNet '$VNetName'."
+        return $null
+    }
+
+    # Check Delegation
+    $hasDelegation = $false
+    
+    # Ensure delegations is treated as an array even if single object
+    $delegations = @($subnetInfo.delegations)
+    
+    if ($delegations -and $delegations.Count -gt 0) {
+        foreach ($del in $delegations) {
+            # Try various property paths to find serviceName
+            $serviceName = $null
+            
+            if ($del.properties -and $del.properties.serviceName) {
+                $serviceName = $del.properties.serviceName
+            } elseif ($del.serviceName) {
+                $serviceName = $del.serviceName
+            } elseif ($del.PSObject.Properties['properties'] -and $del.PSObject.Properties['properties'].Value.serviceName) {
+                $serviceName = $del.PSObject.Properties['properties'].Value.serviceName
+            }
+            
+            if ($serviceName -eq "Microsoft.Databricks/workspaces") {
+                $hasDelegation = $true
+                break
+            }
+        }
+    }
+
+    if (-not $hasDelegation) {
+        $found = if ($subnetInfo.delegations) { 
+             $subnetInfo.delegations | ForEach-Object { 
+                if ($_.properties.serviceName) { $_.properties.serviceName } 
+                elseif ($_.PSObject.Properties['properties'].Value.serviceName) { $_.PSObject.Properties['properties'].Value.serviceName }
+             }
+        } else { "None" }
+        Write-Error "Subnet '$SubnetName' is missing the required delegation to 'Microsoft.Databricks/workspaces'. Found: $($found -join ', ')"
+        exit 1
+    }
+
+    # Check NSG Association
+    if (-not $subnetInfo.networkSecurityGroup.id) {
+        Write-Error "Subnet '$SubnetName' does not have a Network Security Group (NSG) associated. A security group is required."
+        exit 1
+    }
+
+    return $subnetInfo
+}
+
 # Validate Public Subnet
 Write-Host "Validating Public Subnet..." -ForegroundColor Cyan
-if (-not (az network vnet subnet show --resource-group $VNetRG --vnet-name $VNetName --name $PublicSubnetName --query "id" -o tsv 2>$null)) {
-    Write-Warning "Public Subnet '$PublicSubnetName' not found in VNet '$VNetName'."
-    do {
-        $PublicSubnetName = Read-Host "Please re-enter the valid Public Subnet Name"
-    } while (-not (az network vnet subnet show --resource-group $VNetRG --vnet-name $VNetName --name $PublicSubnetName --query "id" -o tsv 2>$null))
+while (-not (Validate-Subnet -SubnetName $PublicSubnetName -VNetRG $VNetRG -VNetName $VNetName -Role "Public")) {
+    $PublicSubnetName = Read-Host "Please re-enter the valid Public Subnet Name"
 }
 
 # Validate Private Subnet
 Write-Host "Validating Private Subnet..." -ForegroundColor Cyan
-if (-not (az network vnet subnet show --resource-group $VNetRG --vnet-name $VNetName --name $PrivateSubnetName --query "id" -o tsv 2>$null)) {
-    Write-Warning "Private Subnet '$PrivateSubnetName' not found in VNet '$VNetName'."
-    do {
-        $PrivateSubnetName = Read-Host "Please re-enter the valid Private Subnet Name"
-    } while (-not (az network vnet subnet show --resource-group $VNetRG --vnet-name $VNetName --name $PrivateSubnetName --query "id" -o tsv 2>$null))
+while (-not (Validate-Subnet -SubnetName $PrivateSubnetName -VNetRG $VNetRG -VNetName $VNetName -Role "Private")) {
+    $PrivateSubnetName = Read-Host "Please re-enter the valid Private Subnet Name"
 }
 
 # Export Template

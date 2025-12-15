@@ -21,7 +21,10 @@ This script is ideal for running in the **Azure Cloud Shell** (PowerShell mode).
 
 ### Script Features
 
-1. **Validation**: Checks if the provided VNet and Subnets exist. If not, prompts for re-entry.
+1. **Validation**: Checks if the provided VNet and Subnets exist.
+   - **Region Check**: Ensures the VNet is in the same region as the Workspace.
+   - **Delegation Check**: Ensures subnets are delegated to `Microsoft.Databricks/workspaces`.
+   - **NSG Check**: Ensures subnets have a Network Security Group associated.
 2. **Export**: Exports the current ARM template of the specified Databricks Workspace.
 3. **Modification**:
    - Updates the `apiVersion` to `2025-08-01-preview`.
