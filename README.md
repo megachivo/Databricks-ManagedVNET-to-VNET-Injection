@@ -1,16 +1,15 @@
 # Azure Databricks VNet Injection Updater
 
-This project provides scripts to automate the process of updating an Azure Databricks workspace to use VNet Injection (or updating its VNet configuration), as described in the [Microsoft documentation](https://learn.microsoft.com/en-us/azure/databricks/security/network/classic/update-workspaces).
+This project provides a PowerShell script to automate the process of updating an Azure Databricks workspace to use VNet Injection (or updating its VNet configuration), as described in the [Microsoft documentation](https://learn.microsoft.com/en-us/azure/databricks/security/network/classic/update-workspaces).
 
 ## Prerequisites
 
 - **Azure CLI (`az`)**: Installed and logged in.
-- **`jq`**: Installed (required for Bash script only).
-- **PowerShell**: Required for the `.ps1` script (standard in Azure Cloud Shell).
+- **PowerShell**: Required to run the script (available in Azure Cloud Shell).
 
-## Usage (PowerShell)
+## Usage
 
-Ideal for running in the Azure Portal (Cloud Shell).
+This script is ideal for running in the **Azure Cloud Shell** (PowerShell mode).
 
 ```powershell
 ./update_databricks_vnet.ps1 `
@@ -20,27 +19,19 @@ Ideal for running in the Azure Portal (Cloud Shell).
   -PrivateSubnetName "my-private-subnet"
 ```
 
-## Usage (Bash)
+### Script Features
 
-```bash
-./update_databricks_vnet.sh \
-  --workspace-id "/subscriptions/<sub-id>/resourceGroups/<rg-name>/providers/Microsoft.Databricks/workspaces/<workspace-name>" \
-  --vnet-id "/subscriptions/<sub-id>/resourceGroups/<rg-name>/providers/Microsoft.Network/virtualNetworks/<vnet-name>" \
-  --public-subnet "my-public-subnet" \
-  --private-subnet "my-private-subnet"
-```
-
-## What it does
-
-1. **Exports** the current ARM template of the specified Databricks Workspace using `az group export`.
-2. **Modifies** the template locally (using `jq` in Bash or `ConvertFrom-Json` in PowerShell) to:
-   - Update the `apiVersion` to `2025-08-01-preview`.
-   - Remove legacy parameters (`vnetAddressPrefix`, `natGatewayName`, `publicIpName`).
-   - Add/Update VNet Injection parameters (`customVirtualNetworkId`, `customPublicSubnetName`, `customPrivateSubnetName`).
-   - Remove read-only properties like `provisioningState`.
-3. **Deploys** the updated template back to the resource group in `Incremental` mode to apply the changes.
+1. **Validation**: Checks if the provided VNet and Subnets exist. If not, prompts for re-entry.
+2. **Export**: Exports the current ARM template of the specified Databricks Workspace.
+3. **Modification**:
+   - Updates the `apiVersion` to `2025-08-01-preview`.
+   - Removes legacy parameters (`vnetAddressPrefix`, `natGatewayName`, `publicIpName`).
+   - Removes existing storage account parameters to prevent deployment conflicts.
+   - Inject new VNet parameters (`customVirtualNetworkId`, `customPublicSubnetName`, `customPrivateSubnetName`).
+   - Automatically handles missing default values for workspace name parameters.
+4. **Deployment**: Redeploys the updated template to apply the changes.
 
 ## Notes
 
-- Ensure the new VNet and subnets exist and have the correct delegations (Microsoft.Databricks/workspaces) before running this script.
-- The script uses the current Azure CLI session. Run `az login` first.
+- Ensure the new VNet and subnets have the correct delegations (`Microsoft.Databricks/workspaces`) before running this script.
+- The script uses the current Azure CLI session. Run `az login` first if running locally.
