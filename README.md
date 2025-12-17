@@ -6,6 +6,12 @@ This project provides a PowerShell script to automate the process of updating an
 
 - **Azure CLI (`az`)**: Installed and logged in.
 - **PowerShell**: Required to run the script (available in Azure Cloud Shell).
+- **Virtual Network (VNet) Configuration**:
+  - Must be in the **same region** as the Databricks Workspace.
+  - **Subnets**: Requires two subnets (public and private).
+  - **Delegation**: Each subnet must be delegated to `Microsoft.Databricks/workspaces`.
+  - **Network Security Group (NSG)**: Each subnet must have an NSG associated (typically an empty one).
+  - **Outbound Connectivity**: If using No Public IP (NPIP) / Secure Cluster Connectivity, an explicit outbound method (NAT Gateway, Firewall, or Load Balancer) must be configured on the subnets.
 
 ## Usage
 
