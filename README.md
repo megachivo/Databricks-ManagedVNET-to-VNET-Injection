@@ -11,7 +11,7 @@ This project provides a PowerShell script to automate the process of updating an
   - **Subnets**: Requires two subnets (public and private).
   - **Delegation**: Each subnet must be delegated to `Microsoft.Databricks/workspaces`.
   - **Network Security Group (NSG)**: Each subnet must have an NSG associated (typically an empty one).
-  - **Outbound Connectivity**: If using No Public IP (NPIP) / Secure Cluster Connectivity, an explicit outbound method (NAT Gateway, Firewall, or Load Balancer) must be configured on the subnets.
+  - **Outbound Connectivity**: If using No Public IP (NPIP) / Secure Cluster Connectivity, an explicit outbound method (NAT Gateway or Firewall) must be configured on the subnets.
 
 ## Usage
 
