@@ -33,7 +33,7 @@ This script is ideal for running in the **Azure Cloud Shell** (PowerShell mode).
    - **NSG Check**: Ensures subnets have a Network Security Group associated.
 2. **Export**: Exports the current ARM template of the specified Databricks Workspace.
 3. **Modification**:
-   - Updates the `apiVersion` to `2025-08-01-preview`.
+   - Updates the `apiVersion` to `2026-01-01`.
    - Removes legacy parameters (`vnetAddressPrefix`, `natGatewayName`, `publicIpName`).
    - Removes existing storage account parameters to prevent deployment conflicts.
    - Inject new VNet parameters (`customVirtualNetworkId`, `customPublicSubnetName`, `customPrivateSubnetName`).
