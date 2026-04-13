@@ -184,7 +184,7 @@ try {
             $found = $true
             
             # Update API Version
-            $res.apiVersion = "2025-08-01-preview"
+            $res.apiVersion = "2026-01-01"
 
             # Remove legacy properties if they exist
             $legacyProps = @("vnetAddressPrefix", "natGatewayName", "publicIpName", "storageAccountName", "storageAccountSkuName")
